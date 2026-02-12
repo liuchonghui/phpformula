@@ -1,30 +1,30 @@
 <?php
 /**
- * 数学公式可视化入口文件 v2.0
- * 访问地址：http://localhost/formula/index.php
- * 核心升级：新增tan/ctan、反三角函数、双曲函数、ln(x)、e^x、更多幂函数、2x+1等预制公式
+ * 数学公式可视化入口文件 v3.0
+ * 核心升级：修正tan曲线、函数说明卡片、移动端缩放、鼠标悬停坐标提示
  */
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>数学公式笛卡尔坐标系可视化 v2.0</title>
-    <link rel="stylesheet" href="css/style.css"> <!-- 保留原有CSS，不修改 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>数学公式笛卡尔坐标系可视化 v3.0</title>
+    <link rel="stylesheet" href="css/style.css">
     <script src="lib/math.min.js"></script>
 </head>
 <body>
+    <!-- 左侧抽屉（公式选择/编辑区） -->
     <div class="drawer" id="drawer">
         <div class="drawer-header">
-            <h3>公式设置 v2.0</h3>
+            <h3>公式设置 v3.0</h3>
             <button class="toggle-btn" id="toggleDrawer">收起</button>
         </div>
         <div class="drawer-content">
             <div class="formula-group">
                 <label>预制公式：</label>
                 <select id="presetFormula">
-                    <!-- 基础三角函数（新增tan/ctan） -->
+                    <!-- 基础三角函数 -->
                     <option value="sin(x)">正弦曲线 y=sin(x)</option>
                     <option value="cos(x)">余弦曲线 y=cos(x)</option>
                     <option value="tan(x)">正切曲线 y=tan(x)</option>
@@ -40,7 +40,7 @@
                     <!-- 对数/指数 -->
                     <option value="ln(x)">自然对数 y=ln(x)</option>
                     <option value="exp(x)">指数函数 y=e^x</option>
-                    <!-- 幂函数/根式（扩展） -->
+                    <!-- 幂函数/根式 -->
                     <option value="x^2">二次曲线 y=x²</option>
                     <option value="x^3">三次曲线 y=x³</option>
                     <option value="x^4">四次曲线 y=x⁴</option>
@@ -65,8 +65,29 @@
             </div>
         </div>
     </div>
+
+    <!-- 抽屉展开/收起按钮 -->
     <button class="drawer-toggle-btn" id="showDrawer">展开公式设置</button>
+
+    <!-- 函数说明卡片（悬浮展示，不影响坐标系） -->
+    <div class="formula-info-card" id="formulaInfoCard">
+        <div class="card-header">
+            <span id="formulaInfoTitle">函数说明</span>
+            <button class="close-card-btn" id="closeInfoCard">×</button>
+        </div>
+        <div class="card-content" id="formulaInfoContent">
+            请选择一个预制公式查看详细说明...
+        </div>
+    </div>
+
+    <!-- 鼠标悬停坐标提示框 -->
+    <div class="coord-tooltip" id="coordTooltip" style="display: none;">
+        <span id="tooltipText"></span>
+    </div>
+
+    <!-- 笛卡尔坐标系绘制区域 -->
     <canvas id="coordinateCanvas"></canvas>
+
     <script src="js/formula.js"></script>
 </body>
 </html>
