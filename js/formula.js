@@ -84,15 +84,31 @@ function drawCoordinateSystem() {
     ctx.fillText('0', ox + 5, oy + 15);
 }
 
-// 关键修复：把 x^2 → pow(x,2)，x^3 → pow(x,3)
+// 核心优化：兼容v2.0所有新增函数的表达式转换
 function convertFormula(f) {
+    if (!f) return '';
+    
+    // 基础幂函数转换（保留原有）
     f = f.replace(/x\^2/g, 'pow(x,2)');
     f = f.replace(/x\^3/g, 'pow(x,3)');
+    // 新增幂函数转换
+    f = f.replace(/x\^4/g, 'pow(x,4)'); // x^4 → pow(x,4)
+    f = f.replace(/x\^0.5/g, 'sqrt(x)'); // x^0.5 → sqrt(x)
+    f = f.replace(/x\^\(1\/3\)/g, 'pow(x,1/3)'); // x^(1/3) → pow(x,1/3)
+    
+    // 新增特殊函数转换
+    f = f.replace(/√x/g, 'sqrt(x)'); // 平方根符号 → sqrt(x)
+    f = f.replace(/e\^x/g, 'exp(x)'); // e^x → exp(x)（math.js原生）
+    f = f.replace(/ln\(/g, 'log(');   // ln(x) → log(x)（math.js中log默认自然对数）
+    f = f.replace(/ctan\(/g, '1/tan('); // ctan(x) → 1/tan(x)
+    f = f.replace(/cot\(/g, '1/tan(');  // 兼容cot(x) → 1/tan(x)
+    
+    // 剩余^转**（math.js支持**作为幂运算符）
     f = f.replace(/\^/g, '**');
+    
     return f;
 }
 
-// 关键修复：绘制逻辑
 function drawFormulaCurve(formula) {
     const f = convertFormula(formula);
     if (!f) return;
@@ -139,7 +155,6 @@ function drawFormulaCurve(formula) {
     ctx.stroke();
 }
 
-// 缩放：放大变宽，最小 -10~10
 function handleWheel(e) {
     e.preventDefault();
     const factor = 1.2;
