@@ -164,6 +164,14 @@
     border: 1px solid #ddd;
     border-radius: 4px;
 }
+/* 优化下拉框样式（适配趣味曲线分组） */
+.formula-group select optgroup {
+    font-weight: bold;
+    color: #007bff;
+}
+.formula-group select option {
+    color: #333;
+}
 #refreshBtn {
     width: 100%;
     padding: 8px;

@@ -4,8 +4,10 @@ const config = {
     xRange: [-10, 10],
     yRange: [-10, 10],
     currentFormula: 'sin(x)',
-    // 函数说明配置
+    currentCurveType: 'normal', // normal:基础函数, fun:趣味曲线
+    // 函数说明配置（更新趣味曲线说明）
     formulaInfos: {
+        // 基础可编辑函数（保留原有说明）
         'sin(x)': '正弦函数 y=sin(x)\n• 定义域：全体实数 R\n• 值域：[-1, 1]\n• 奇偶性：奇函数\n• 周期：2π\n• 单调性：在[-π/2+2kπ, π/2+2kπ]递增，在[π/2+2kπ, 3π/2+2kπ]递减',
         'cos(x)': '余弦函数 y=cos(x)\n• 定义域：全体实数 R\n• 值域：[-1, 1]\n• 奇偶性：偶函数\n• 周期：2π\n• 单调性：在[2kπ, π+2kπ]递减，在[π+2kπ, 2π+2kπ]递增',
         'tan(x)': '正切函数 y=tan(x)\n• 定义域：{x | x ≠ π/2 + kπ, k∈Z}\n• 值域：全体实数 R\n• 奇偶性：奇函数\n• 周期：π\n• 单调性：在(-π/2+kπ, π/2+kπ)内单调递增',
@@ -24,7 +26,16 @@ const config = {
         'sqrt(x)': '平方根函数 y=√x\n• 定义域：[0, +∞)\n• 值域：[0, +∞)\n• 奇偶性：非奇非偶\n• 单调性：在[0,+∞)上单调递增',
         'x^(1/3)': '立方根函数 y=x^(1/3)\n• 定义域：全体实数 R\n• 值域：全体实数 R\n• 奇偶性：奇函数\n• 单调性：在R上单调递增',
         '1/x': '反比例函数 y=1/x\n• 定义域：{x | x ≠ 0}\n• 值域：{y | y ≠ 0}\n• 奇偶性：奇函数\n• 单调性：在(-∞,0)和(0,+∞)上分别递减',
-        '2*x+1': '线性函数 y=2x+1\n• 定义域：全体实数 R\n• 值域：全体实数 R\n• 奇偶性：非奇非偶\n• 单调性：在R上单调递增\n• 斜率：2，截距：1'
+        '2*x+1': '线性函数 y=2x+1\n• 定义域：全体实数 R\n• 值域：全体实数 R\n• 奇偶性：非奇非偶\n• 单调性：在R上单调递增\n• 斜率：2，截距：1',
+        // 趣味曲线（仅展示）说明
+        'heart': '心形线\n• 极坐标方程：r = 1 - sinθ 或 r = a(1 - cosθ)\n• 笛卡尔方程：x²+(y-√(x²))²=1\n• 特性：关于y轴对称，完整心形图案',
+        'beat_heart': '跳动心形线\n• 基于基础心形线叠加正弦波动\n• 特性：边缘呈周期性波动，视觉上“跳动”',
+        'rose_13': '13瓣玫瑰线\n• 极坐标方程：r = cos(13θ/2)\n• 特性：13个对称花瓣，奇数瓣玫瑰线',
+        'rose_5': '五瓣玫瑰线\n• 极坐标方程：r = sin(5θ)\n• 特性：5个对称花瓣，简洁美观',
+        'archimedes': '阿基米德螺线\n• 极坐标方程：r = aθ（a为常数）\n• 特性：随θ增大，螺线均匀向外扩展\n• 应用：螺旋楼梯、蚊香等设计',
+        'damped_sin': '衰减正弦曲线\n• 方程：y = e^(-x/10) * sin(x)\n• 特性：正弦波振幅随x指数衰减\n• 应用：物理阻尼振动、电路衰减信号',
+        'circle': '单位圆\n• 方程：x² + y² = 1\n• 特性：圆心在原点，半径1，对称图形',
+        'ellipse': '椭圆 x²/4 + y²/9 = 1\n• 长轴：y轴方向，长度6（半长轴3）\n• 短轴：x轴方向，长度4（半短轴2）\n• 离心率：√5/3 ≈ 0.745'
     },
     // 缩放范围配置
     maxZoomRange: {
@@ -48,7 +59,7 @@ function initCanvas() {
     bindDrawerEvents();
     bindZoomBtnEvents(); 
     bindInfoCardEvents();
-    bindTooltipEvents(); // 恢复坐标提示绑定
+    bindTooltipEvents();
     redrawAll();
 }
 
@@ -57,9 +68,16 @@ function resizeCanvas() {
     config.canvas.height = window.innerHeight;
 }
 
+// 重构redrawAll：区分基础函数和趣味曲线
 function redrawAll() {
     drawCoordinateSystem();
-    drawFormulaCurve(config.currentFormula);
+    if (config.currentCurveType === 'fun') {
+        // 绘制趣味曲线
+        drawFunCurve(config.currentFormula);
+    } else {
+        // 绘制基础函数（原有逻辑）
+        drawFormulaCurve(config.currentFormula);
+    }
 }
 
 function drawCoordinateSystem() {
@@ -119,6 +137,7 @@ function drawCoordinateSystem() {
     ctx.fillText('0', ox + 5, oy + 15);
 }
 
+// 原有基础函数绘制逻辑（保留）
 function convertFormula(f) {
     if (!f) return '';
     
@@ -139,7 +158,6 @@ function convertFormula(f) {
     return f;
 }
 
-// 修复tan曲线竖线问题
 function drawFormulaCurve(formula) {
     const f = convertFormula(formula);
     if (!f) return;
@@ -201,7 +219,148 @@ function drawFormulaCurve(formula) {
     ctx.stroke();
 }
 
-// 缩放逻辑（区分PC/移动端范围）
+// 新增：趣味曲线独立绘制函数
+function drawFunCurve(curveType) {
+    const { ctx, canvas, xRange, yRange } = config;
+    const w = canvas.width;
+    const h = canvas.height;
+    const xMin = xRange[0], xMax = xRange[1];
+    const yMin = yRange[0], yMax = yRange[1];
+    const ox = w / 2;
+    const oy = h / 2;
+    const px = w / (xMax - xMin);
+    const py = h / (yMax - yMin);
+    const step = 0.01; // 高精度步长保证曲线平滑
+
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+
+    switch (curveType) {
+        case 'heart': // 心形线（极坐标转笛卡尔）
+            for (let θ = 0; θ < 2 * Math.PI; θ += step) {
+                const r = 5 * (1 - Math.sin(θ)); // 极坐标方程
+                const x = r * Math.cos(θ);
+                const y = r * Math.sin(θ);
+                const pxX = ox + x * px;
+                const pxY = oy - y * py;
+                if (θ === 0) {
+                    ctx.moveTo(pxX, pxY);
+                } else {
+                    ctx.lineTo(pxX, pxY);
+                }
+            }
+            break;
+        
+        case 'beat_heart': // 跳动心形线
+            for (let x = -3; x <= 3; x += step) {
+                const y1 = Math.pow(Math.pow(x, 2), 1/3) + 0.9 * Math.sqrt(3.3 - Math.pow(x, 2)) * Math.sin(10 * Math.PI * x);
+                const y2 = Math.pow(Math.pow(x, 2), 1/3) + 0.9 * Math.sqrt(3.3 - Math.pow(x, 2)) * Math.cos(10 * Math.PI * x);
+                // 绘制上下波动的两条线
+                const pxX = ox + x * px;
+                const pxY1 = oy - y1 * py;
+                const pxY2 = oy - y2 * py;
+                
+                if (x === -3) {
+                    ctx.moveTo(pxX, pxY1);
+                } else {
+                    ctx.lineTo(pxX, pxY1);
+                }
+                ctx.moveTo(pxX, pxY2);
+            }
+            break;
+        
+        case 'rose_13': // 13瓣玫瑰线
+            for (let θ = 0; θ < 4 * Math.PI; θ += step) {
+                const r = 5 * Math.cos(13 * θ / 2);
+                const x = r * Math.cos(θ);
+                const y = r * Math.sin(θ);
+                const pxX = ox + x * px;
+                const pxY = oy - y * py;
+                if (θ === 0) {
+                    ctx.moveTo(pxX, pxY);
+                } else {
+                    ctx.lineTo(pxX, pxY);
+                }
+            }
+            break;
+        
+        case 'rose_5': // 五瓣玫瑰线
+            for (let θ = 0; θ < 2 * Math.PI; θ += step) {
+                const r = 5 * Math.sin(5 * θ);
+                const x = r * Math.cos(θ);
+                const y = r * Math.sin(θ);
+                const pxX = ox + x * px;
+                const pxY = oy - y * py;
+                if (θ === 0) {
+                    ctx.moveTo(pxX, pxY);
+                } else {
+                    ctx.lineTo(pxX, pxY);
+                }
+            }
+            break;
+        
+        case 'archimedes': // 阿基米德螺线
+            for (let θ = 0; θ < 6 * Math.PI; θ += step) {
+                const r = θ / 2;
+                const x = r * Math.cos(θ);
+                const y = r * Math.sin(θ);
+                const pxX = ox + x * px;
+                const pxY = oy - y * py;
+                if (θ === 0) {
+                    ctx.moveTo(pxX, pxY);
+                } else {
+                    ctx.lineTo(pxX, pxY);
+                }
+            }
+            break;
+        
+        case 'damped_sin': // 衰减正弦曲线
+            for (let x = -10; x <= 30; x += step) {
+                const y = Math.exp(-x/10) * Math.sin(x);
+                const pxX = ox + x * px;
+                const pxY = oy - y * py;
+                if (x === -10) {
+                    ctx.moveTo(pxX, pxY);
+                } else {
+                    ctx.lineTo(pxX, pxY);
+                }
+            }
+            break;
+        
+        case 'circle': // 单位圆
+            for (let θ = 0; θ < 2 * Math.PI; θ += step) {
+                const x = 5 * Math.cos(θ); // 放大5倍便于观察
+                const y = 5 * Math.sin(θ);
+                const pxX = ox + x * px;
+                const pxY = oy - y * py;
+                if (θ === 0) {
+                    ctx.moveTo(pxX, pxY);
+                } else {
+                    ctx.lineTo(pxX, pxY);
+                }
+            }
+            break;
+        
+        case 'ellipse': // 椭圆 x²/4 + y²/9 = 1
+            for (let θ = 0; θ < 2 * Math.PI; θ += step) {
+                const x = 4 * Math.cos(θ); // 半长轴4（x方向）
+                const y = 6 * Math.sin(θ); // 半长轴6（y方向）
+                const pxX = ox + x * px;
+                const pxY = oy - y * py;
+                if (θ === 0) {
+                    ctx.moveTo(pxX, pxY);
+                } else {
+                    ctx.lineTo(pxX, pxY);
+                }
+            }
+            break;
+    }
+
+    ctx.stroke();
+}
+
+// 缩放逻辑（保留原有）
 function handleWheel(e) {
     e.preventDefault();
     const factor = 1.2;
@@ -230,7 +389,7 @@ function handleWheel(e) {
     redrawAll();
 }
 
-// 绑定缩放按钮事件（右下角按钮）
+// 绑定缩放按钮事件（保留原有）
 function bindZoomBtnEvents() {
     const zoomInBtn = document.getElementById('zoomInBtn');
     const zoomOutBtn = document.getElementById('zoomOutBtn');
@@ -263,7 +422,7 @@ function bindZoomBtnEvents() {
     };
 }
 
-// 绑定抽屉事件
+// 重构抽屉事件：区分基础函数和趣味曲线
 function bindDrawerEvents() {
     const drawer = document.getElementById('drawer');
     const toggleDrawerBtn = document.getElementById('toggleDrawer');
@@ -277,9 +436,24 @@ function bindDrawerEvents() {
 
     preset.onchange = () => {
         const f = preset.value;
-        input.value = f;
-        config.currentFormula = f;
-        updateFormulaInfo(f); // 更新卡片内容
+        input.value = ''; // 趣味曲线清空自定义输入框
+        // 判断是否为趣味曲线
+        const funCurveTypes = ['heart', 'beat_heart', 'rose_13', 'rose_5', 'archimedes', 'damped_sin', 'circle', 'ellipse'];
+        if (funCurveTypes.includes(f)) {
+            config.currentFormula = f;
+            config.currentCurveType = 'fun';
+            // 禁用自定义输入和刷新按钮
+            input.disabled = true;
+            refresh.disabled = true;
+        } else {
+            config.currentFormula = f;
+            config.currentCurveType = 'normal';
+            input.value = f;
+            // 启用自定义输入和刷新按钮
+            input.disabled = false;
+            refresh.disabled = false;
+        }
+        updateFormulaInfo(f);
         redrawAll();
     };
 
@@ -287,21 +461,21 @@ function bindDrawerEvents() {
         const f = input.value.trim();
         if (f) {
             config.currentFormula = f;
-            // 自定义公式更新卡片提示
+            config.currentCurveType = 'normal';
             document.getElementById('formulaInfoContent').innerHTML = '自定义公式暂无详细说明';
             redrawAll();
         }
     };
 
     input.onkeydown = (e) => {
-        if (e.key === 'Enter') refresh.click();
+        if (e.key === 'Enter' && !input.disabled) refresh.click();
     };
 
     // 初始化默认公式说明
     updateFormulaInfo(config.currentFormula);
 }
 
-// 绑定函数说明卡片事件
+// 绑定函数说明卡片事件（保留原有）
 function bindInfoCardEvents() {
     const closeBtn = document.getElementById('closeInfoCard');
     const card = document.getElementById('formulaInfoCard');
@@ -313,14 +487,14 @@ function bindInfoCardEvents() {
     card.style.display = 'block';
 }
 
-// 恢复：绑定鼠标悬停坐标提示事件
+// 绑定鼠标悬停坐标提示事件（适配趣味曲线，简化提示）
 function bindTooltipEvents() {
     const tooltip = document.getElementById('coordTooltip');
     const tooltipText = document.getElementById('tooltipText');
     const canvas = config.canvas;
 
     canvas.addEventListener('mousemove', (e) => {
-        const { xRange, yRange } = config;
+        const { xRange, yRange, currentCurveType } = config;
         const w = canvas.width;
         const h = canvas.height;
         const xMin = xRange[0], xMax = xRange[1];
@@ -335,27 +509,34 @@ function bindTooltipEvents() {
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        // 转换为数学坐标系的x值（取最近的自然数）
-        const mathX = Math.round((mouseX - ox) / px);
-        // 计算对应y值
-        const f = convertFormula(config.currentFormula);
-        if (f) {
-            try {
-                const mathY = math.evaluate(f, { x: mathX });
-                // 仅在y值有效且为有限数时显示
-                if (!isNaN(mathY) && isFinite(mathY)) {
-                    const roundY = Math.round(mathY * 100) / 100; // 保留两位小数
-                    tooltipText.textContent = `(${mathX}, ${roundY})`;
-                    // 定位提示框（鼠标右下方）
-                    tooltip.style.left = `${e.clientX + 10}px`;
-                    tooltip.style.top = `${e.clientY + 10}px`;
-                    tooltip.style.display = 'block';
-                    return;
+        // 转换为数学坐标系坐标
+        const mathX = Math.round((mouseX - ox) / px * 100) / 100;
+        const mathY = Math.round((oy - mouseY) / py * 100) / 100;
+
+        if (currentCurveType === 'fun') {
+            // 趣味曲线仅显示鼠标位置坐标
+            tooltipText.textContent = `坐标：(${mathX}, ${mathY})`;
+        } else {
+            // 基础函数显示计算后坐标（原有逻辑）
+            const mathXInt = Math.round(mathX);
+            const f = convertFormula(config.currentFormula);
+            if (f) {
+                try {
+                    const calcY = math.evaluate(f, { x: mathXInt });
+                    const roundY = Math.round(calcY * 100) / 100;
+                    tooltipText.textContent = `(${mathXInt}, ${roundY})`;
+                } catch (e) {
+                    tooltipText.textContent = `坐标：(${mathX}, ${mathY})`;
                 }
-            } catch (e) {}
+            } else {
+                tooltipText.textContent = `坐标：(${mathX}, ${mathY})`;
+            }
         }
-        // 无效值隐藏提示框
-        tooltip.style.display = 'none';
+
+        // 定位提示框（鼠标右下方）
+        tooltip.style.left = `${e.clientX + 10}px`;
+        tooltip.style.top = `${e.clientY + 10}px`;
+        tooltip.style.display = 'block';
     });
 
     canvas.addEventListener('mouseleave', () => {
@@ -363,7 +544,7 @@ function bindTooltipEvents() {
     });
 }
 
-// 更新公式说明卡片内容
+// 更新公式说明卡片内容（保留原有）
 function updateFormulaInfo(formula) {
     const content = document.getElementById('formulaInfoContent');
     content.innerHTML = config.formulaInfos[formula] 
