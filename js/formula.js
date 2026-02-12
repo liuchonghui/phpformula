@@ -4,7 +4,7 @@ const config = {
     xRange: [-10, 10],
     yRange: [-10, 10],
     currentFormula: 'sin(x)',
-    // 新增：函数说明配置
+    // 函数说明配置
     formulaInfos: {
         'sin(x)': '正弦函数 y=sin(x)\n• 定义域：全体实数 R\n• 值域：[-1, 1]\n• 奇偶性：奇函数\n• 周期：2π\n• 单调性：在[-π/2+2kπ, π/2+2kπ]递增，在[π/2+2kπ, 3π/2+2kπ]递减',
         'cos(x)': '余弦函数 y=cos(x)\n• 定义域：全体实数 R\n• 值域：[-1, 1]\n• 奇偶性：偶函数\n• 周期：2π\n• 单调性：在[2kπ, π+2kπ]递减，在[π+2kπ, 2π+2kπ]递增',
@@ -26,12 +26,15 @@ const config = {
         '1/x': '反比例函数 y=1/x\n• 定义域：{x | x ≠ 0}\n• 值域：{y | y ≠ 0}\n• 奇偶性：奇函数\n• 单调性：在(-∞,0)和(0,+∞)上分别递减',
         '2*x+1': '线性函数 y=2x+1\n• 定义域：全体实数 R\n• 值域：全体实数 R\n• 奇偶性：非奇非偶\n• 单调性：在R上单调递增\n• 斜率：2，截距：1'
     },
-    // 新增：移动端缩放相关
-    touchStart: { x: 0, y: 0, distance: 0 },
-    isTouching: false
+    // 缩放范围配置
+    maxZoomRange: {
+        pc: { x: [-1000, 1000], y: [-1000, 1000] },
+        mobile: { x: [-100, 100], y: [-100, 100] }
+    },
+    minZoomRange: { x: [-10, 10], y: [-10, 10] },
+    isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 };
 
-// 初始化画布
 function initCanvas() {
     if (typeof math === 'undefined') {
         alert('math.min.js 加载失败！');
@@ -41,29 +44,24 @@ function initCanvas() {
     config.ctx = config.canvas.getContext('2d');
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-    
-    // 绑定事件：鼠标滚轮 + 移动端触摸
-    bindZoomEvents();
+    config.canvas.addEventListener('wheel', handleWheel);
     bindDrawerEvents();
-    bindTooltipEvents();
+    bindZoomBtnEvents(); 
     bindInfoCardEvents();
-    
+    bindTooltipEvents(); // 恢复坐标提示绑定
     redrawAll();
 }
 
-// 调整画布尺寸
 function resizeCanvas() {
     config.canvas.width = window.innerWidth;
     config.canvas.height = window.innerHeight;
 }
 
-// 重绘所有内容
 function redrawAll() {
     drawCoordinateSystem();
     drawFormulaCurve(config.currentFormula);
 }
 
-// 绘制坐标系
 function drawCoordinateSystem() {
     const { ctx, canvas, xRange, yRange } = config;
     const w = canvas.width;
@@ -72,12 +70,12 @@ function drawCoordinateSystem() {
     const yMin = yRange[0], yMax = yRange[1];
     const ox = w / 2;
     const oy = h / 2;
-    const px = w / (xMax - xMin); // x轴像素/单位
-    const py = h / (yMax - yMin); // y轴像素/单位
+    const px = w / (xMax - xMin);
+    const py = h / (yMax - yMin);
 
     ctx.clearRect(0, 0, w, h);
 
-    // 绘制网格线
+    // 绘制网格
     ctx.strokeStyle = '#eee';
     ctx.lineWidth = 1;
     for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
@@ -105,7 +103,7 @@ function drawCoordinateSystem() {
     ctx.lineTo(ox, h);
     ctx.stroke();
 
-    // 绘制刻度文字
+    // 绘制刻度
     ctx.fillStyle = '#333';
     ctx.font = '12px Arial';
     for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
@@ -121,31 +119,27 @@ function drawCoordinateSystem() {
     ctx.fillText('0', ox + 5, oy + 15);
 }
 
-// 公式转换：兼容所有函数写法
 function convertFormula(f) {
     if (!f) return '';
     
-    // 幂函数转换
     f = f.replace(/x\^2/g, 'pow(x,2)');
     f = f.replace(/x\^3/g, 'pow(x,3)');
     f = f.replace(/x\^4/g, 'pow(x,4)');
     f = f.replace(/x\^0.5/g, 'sqrt(x)');
     f = f.replace(/x\^\(1\/3\)/g, 'pow(x,1/3)');
     
-    // 特殊函数转换
     f = f.replace(/√x/g, 'sqrt(x)');
     f = f.replace(/e\^x/g, 'exp(x)');
     f = f.replace(/ln\(/g, 'log(');
     f = f.replace(/ctan\(/g, '1/tan(');
     f = f.replace(/cot\(/g, '1/tan(');
     
-    // 剩余^转**
     f = f.replace(/\^/g, '**');
     
     return f;
 }
 
-// 核心修复：绘制曲线（解决tan竖线问题）
+// 修复tan曲线竖线问题
 function drawFormulaCurve(formula) {
     const f = convertFormula(formula);
     if (!f) return;
@@ -165,14 +159,13 @@ function drawFormulaCurve(formula) {
     ctx.beginPath();
 
     let first = true;
-    const step = (xMax - xMin) / 2000; // 增加采样点，提升平滑度
+    const step = (xMax - xMin) / 2000;
     const PI = Math.PI;
 
     for (let x = xMin; x <= xMax; x += step) {
         try {
-            // 修复tan曲线：过滤定义域外的点（π/2 ± kπ）
+            // 过滤tan定义域外的点
             if (formula.includes('tan(x)')) {
-                // 计算x是否接近π/2 + kπ（误差范围0.01）
                 const modX = x % PI;
                 if (Math.abs(modX - PI/2) < 0.01 || Math.abs(modX + PI/2) < 0.01) {
                     first = true;
@@ -182,7 +175,6 @@ function drawFormulaCurve(formula) {
 
             const y = math.evaluate(f, { x });
 
-            // 过滤无效值、超出值域的点、无穷大
             if (isNaN(y) || !isFinite(y) || y < yMin - 1 || y > yMax + 1) {
                 first = true;
                 continue;
@@ -191,7 +183,6 @@ function drawFormulaCurve(formula) {
             const pxX = ox + x * px;
             const pxY = oy - y * py;
 
-            // 过滤超出画布的点
             if (pxX < 0 || pxX > w || pxY < 0 || pxY > h) {
                 first = true;
                 continue;
@@ -210,75 +201,66 @@ function drawFormulaCurve(formula) {
     ctx.stroke();
 }
 
-// 绑定缩放事件：鼠标滚轮 + 移动端触摸
-function bindZoomEvents() {
-    // 鼠标滚轮缩放
-    config.canvas.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        zoomHandler(e.deltaY < 0 ? 'in' : 'out');
-    });
-
-    // 移动端触摸缩放
-    config.canvas.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (e.touches.length === 2) {
-            config.isTouching = true;
-            // 计算初始两点距离
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            config.touchStart.x = (touch1.clientX + touch2.clientX) / 2;
-            config.touchStart.y = (touch1.clientY + touch2.clientY) / 2;
-            config.touchStart.distance = getDistance(touch1, touch2);
-        }
-    });
-
-    config.canvas.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        if (config.isTouching && e.touches.length === 2) {
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            const newDistance = getDistance(touch1, touch2);
-            // 判断缩放方向
-            if (newDistance > config.touchStart.distance + 5) {
-                zoomHandler('in');
-                config.touchStart.distance = newDistance;
-            } else if (newDistance < config.touchStart.distance - 5) {
-                zoomHandler('out');
-                config.touchStart.distance = newDistance;
-            }
-        }
-    });
-
-    config.canvas.addEventListener('touchend', () => {
-        config.isTouching = false;
-    });
-}
-
-// 计算两点距离（移动端缩放用）
-function getDistance(touch1, touch2) {
-    const dx = touch2.clientX - touch1.clientX;
-    const dy = touch2.clientY - touch1.clientY;
-    return Math.sqrt(dx*dx + dy*dy);
-}
-
-// 缩放处理逻辑（统一鼠标和移动端）
-function zoomHandler(type) {
+// 缩放逻辑（区分PC/移动端范围）
+function handleWheel(e) {
+    e.preventDefault();
     const factor = 1.2;
-    if (type === 'in') {
-        // 放大：缩小坐标范围
-        config.xRange = [config.xRange[0] / factor, config.xRange[1] / factor];
-        config.yRange = [config.yRange[0] / factor, config.yRange[1] / factor];
+    const maxRange = config.isMobile ? config.maxZoomRange.mobile : config.maxZoomRange.pc;
+    const minRange = config.minZoomRange;
+
+    if (e.deltaY < 0) {
+        // 放大：不小于最小范围
+        const nx0 = config.xRange[0] / factor;
+        const nx1 = config.xRange[1] / factor;
+        const ny0 = config.yRange[0] / factor;
+        const ny1 = config.yRange[1] / factor;
+
+        config.xRange = [Math.max(nx0, minRange.x[0]), Math.min(nx1, minRange.x[1])];
+        config.yRange = [Math.max(ny0, minRange.y[0]), Math.min(ny1, minRange.y[1])];
     } else {
-        // 缩小：扩大坐标范围（限制最大±20）
+        // 缩小：不超过最大范围
         const nx0 = config.xRange[0] * factor;
         const nx1 = config.xRange[1] * factor;
         const ny0 = config.yRange[0] * factor;
         const ny1 = config.yRange[1] * factor;
 
-        config.xRange = [Math.max(nx0, -20), Math.min(nx1, 20)];
-        config.yRange = [Math.max(ny0, -20), Math.min(ny1, 20)];
+        config.xRange = [Math.max(nx0, maxRange.x[0]), Math.min(nx1, maxRange.x[1])];
+        config.yRange = [Math.max(ny0, maxRange.y[0]), Math.min(ny1, maxRange.y[1])];
     }
     redrawAll();
+}
+
+// 绑定缩放按钮事件（右下角按钮）
+function bindZoomBtnEvents() {
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const maxRange = config.isMobile ? config.maxZoomRange.mobile : config.maxZoomRange.pc;
+    const minRange = config.minZoomRange;
+    const factor = 1.2;
+
+    // 放大按钮
+    zoomInBtn.onclick = () => {
+        const nx0 = config.xRange[0] / factor;
+        const nx1 = config.xRange[1] / factor;
+        const ny0 = config.yRange[0] / factor;
+        const ny1 = config.yRange[1] / factor;
+
+        config.xRange = [Math.max(nx0, minRange.x[0]), Math.min(nx1, minRange.x[1])];
+        config.yRange = [Math.max(ny0, minRange.y[0]), Math.min(ny1, minRange.y[1])];
+        redrawAll();
+    };
+
+    // 缩小按钮
+    zoomOutBtn.onclick = () => {
+        const nx0 = config.xRange[0] * factor;
+        const nx1 = config.xRange[1] * factor;
+        const ny0 = config.yRange[0] * factor;
+        const ny1 = config.yRange[1] * factor;
+
+        config.xRange = [Math.max(nx0, maxRange.x[0]), Math.min(nx1, maxRange.x[1])];
+        config.yRange = [Math.max(ny0, maxRange.y[0]), Math.min(ny1, maxRange.y[1])];
+        redrawAll();
+    };
 }
 
 // 绑定抽屉事件
@@ -297,8 +279,7 @@ function bindDrawerEvents() {
         const f = preset.value;
         input.value = f;
         config.currentFormula = f;
-        // 更新函数说明卡片
-        updateFormulaInfo(f);
+        updateFormulaInfo(f); // 更新卡片内容
         redrawAll();
     };
 
@@ -306,8 +287,8 @@ function bindDrawerEvents() {
         const f = input.value.trim();
         if (f) {
             config.currentFormula = f;
-            // 自定义公式清空说明卡片
-            document.getElementById('formulaInfoContent').textContent = '自定义公式暂无详细说明';
+            // 自定义公式更新卡片提示
+            document.getElementById('formulaInfoContent').innerHTML = '自定义公式暂无详细说明';
             redrawAll();
         }
     };
@@ -320,7 +301,19 @@ function bindDrawerEvents() {
     updateFormulaInfo(config.currentFormula);
 }
 
-// 绑定鼠标悬停提示事件
+// 绑定函数说明卡片事件
+function bindInfoCardEvents() {
+    const closeBtn = document.getElementById('closeInfoCard');
+    const card = document.getElementById('formulaInfoCard');
+    
+    closeBtn.onclick = () => {
+        card.style.display = 'none';
+    };
+    // 默认显示卡片
+    card.style.display = 'block';
+}
+
+// 恢复：绑定鼠标悬停坐标提示事件
 function bindTooltipEvents() {
     const tooltip = document.getElementById('coordTooltip');
     const tooltipText = document.getElementById('tooltipText');
@@ -370,27 +363,12 @@ function bindTooltipEvents() {
     });
 }
 
-// 绑定函数说明卡片事件
-function bindInfoCardEvents() {
-    const closeBtn = document.getElementById('closeInfoCard');
-    const card = document.getElementById('formulaInfoCard');
-    
-    closeBtn.onclick = () => {
-        card.style.display = 'none';
-    };
-
-    // 默认显示卡片
-    card.style.display = 'block';
-}
-
-// 更新函数说明卡片内容
+// 更新公式说明卡片内容
 function updateFormulaInfo(formula) {
     const content = document.getElementById('formulaInfoContent');
-    // 替换换行符为<br>，适配HTML显示
     content.innerHTML = config.formulaInfos[formula] 
         ? config.formulaInfos[formula].replace(/\n/g, '<br>') 
         : '请选择一个预制公式查看详细说明...';
 }
 
-// 页面加载初始化
 window.addEventListener('load', initCanvas);

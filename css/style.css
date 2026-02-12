@@ -6,7 +6,7 @@
     font-family: Arial, sans-serif;
 }
 
-/* 画布样式（全屏） */
+/* 画布样式（全屏）- 层级1 */
 #coordinateCanvas {
     position: fixed;
     top: 0;
@@ -15,10 +15,11 @@
     height: 100vh;
     background-color: #f8f9fa;
     cursor: crosshair;
-    touch-action: none; /* 禁用默认触摸行为，适配移动端缩放 */
+    touch-action: none;
+    z-index: 1;
 }
 
-/* 左侧抽屉样式 */
+/* 左侧抽屉样式 - 层级100（最高） */
 .drawer {
     position: fixed;
     top: 0;
@@ -47,7 +48,7 @@
     border-bottom: 1px solid #eee;
 }
 
-.toggle-btn, .drawer-toggle-btn {
+.toggle-btn {
     padding: 6px 12px;
     background-color: #007bff;
     color: white;
@@ -56,54 +57,25 @@
     cursor: pointer;
 }
 
+/* 抽屉展开按钮 - 层级101（高于抽屉） */
 .drawer-toggle-btn {
     position: fixed;
     top: 20px;
     left: 20px;
     z-index: 101;
-    display: none;
-}
-
-/* 抽屉收起时显示展开按钮 */
-.drawer.hidden + .drawer-toggle-btn {
-    display: block;
-}
-
-.formula-group {
-    margin-bottom: 15px;
-}
-
-.formula-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-}
-
-.formula-group select, .formula-group input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-#refreshBtn {
-    width: 100%;
-    padding: 8px;
-    background-color: #28a745;
+    padding: 8px 12px;
+    background-color: #007bff;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    margin-top: 5px;
+    display: none; /* 默认隐藏，抽屉收起时显示 */
+}
+.drawer.hidden ~ .drawer-toggle-btn {
+    display: block;
 }
 
-.tips {
-    margin-top: 20px;
-    font-size: 12px;
-    color: #666;
-}
-
-/* 函数说明卡片样式 */
+/* 函数说明卡片 - 层级99（低于抽屉，高于缩放按钮） */
 .formula-info-card {
     position: fixed;
     top: 20px;
@@ -115,7 +87,6 @@
     z-index: 99;
     overflow: hidden;
 }
-
 .card-header {
     padding: 10px 15px;
     background-color: #007bff;
@@ -124,7 +95,6 @@
     justify-content: space-between;
     align-items: center;
 }
-
 .close-card-btn {
     background: transparent;
     border: none;
@@ -136,7 +106,6 @@
     line-height: 30px;
     text-align: center;
 }
-
 .card-content {
     padding: 15px;
     font-size: 14px;
@@ -144,7 +113,7 @@
     color: #333;
 }
 
-/* 鼠标悬停坐标提示框 */
+/* 鼠标悬停坐标提示框 - 层级102（最高） */
 .coord-tooltip {
     position: fixed;
     padding: 5px 10px;
@@ -157,16 +126,86 @@
     white-space: nowrap;
 }
 
+/* 缩放按钮组：固定右下角 - 层级98（最低的操作层） */
+.zoom-btn-group {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 98;
+    display: flex;
+    flex-direction: column; /* 垂直排列 */
+    gap: 10px;
+}
+.zoom-btn {
+    padding: 10px 15px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.zoom-btn:hover {
+    background-color: #218838;
+}
+
+/* 基础表单样式 */
+.formula-group {
+    margin-bottom: 15px;
+}
+.formula-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+.formula-group select, .formula-group input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+#refreshBtn {
+    width: 100%;
+    padding: 8px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 5px;
+}
+.tips {
+    margin-top: 20px;
+    font-size: 12px;
+    color: #666;
+}
+
 /* 移动端适配 */
 @media (max-width: 768px) {
     .formula-info-card {
         width: calc(100% - 40px);
         top: auto;
-        bottom: 20px;
+        bottom: 80px;
         right: 20px;
+    }
+    .zoom-btn-group {
+        bottom: 10px;
+        right: 10px;
+    }
+    .zoom-btn {
+        padding: 8px 10px;
+        font-size: 14px;
     }
     .drawer {
         width: 100%;
         max-width: 300px;
+    }
+    .drawer-toggle-btn {
+        top: 10px;
+        left: 10px;
+    }
+    .coord-tooltip {
+        font-size: 11px;
+        padding: 4px 8px;
     }
 }
