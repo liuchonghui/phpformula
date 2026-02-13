@@ -1,6 +1,6 @@
 <?php
 /**
- * 数学公式可视化入口文件 v3.0 最终版
+ * 数学公式可视化入口文件 v3.1 最终版
  * 核心调整：趣味曲线改为独立展示模式，不受y=xxx限制
  */
 ?>
@@ -9,7 +9,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>数学公式笛卡尔坐标系可视化 v3.0</title>
+    <title>数学公式笛卡尔坐标系可视化 v3.1</title>
     <link rel="stylesheet" href="css/style.css">
     <script src="lib/math.min.js"></script>
 </head>
@@ -17,7 +17,7 @@
     <!-- 左侧抽屉（公式选择/编辑区）- 层级100 -->
     <div class="drawer" id="drawer">
         <div class="drawer-header">
-            <h3>公式设置 v3.0</h3>
+            <h3>公式设置 v3.1</h3>
             <button class="toggle-btn" id="toggleDrawer">收起</button>
         </div>
         <div class="drawer-content">

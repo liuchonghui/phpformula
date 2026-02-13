@@ -37,12 +37,12 @@ const config = {
         'circle': '单位圆\n• 方程：x² + y² = 1\n• 特性：圆心在原点，半径1，对称图形',
         'ellipse': '椭圆 x²/4 + y²/9 = 1\n• 长轴：y轴方向，长度6（半长轴3）\n• 短轴：x轴方向，长度4（半短轴2）\n• 离心率：√5/3 ≈ 0.745'
     },
-    // 缩放范围配置
+    // 缩放范围配置（调整移动端最大范围，适配全屏）
     maxZoomRange: {
-        pc: { x: [-1000, 1000], y: [-1000, 1000] },
-        mobile: { x: [-100, 100], y: [-100, 100] }
+        pc: { x: [-200, 200], y: [-200, 200] },
+        mobile: { x: [-50, 50], y: [-50, 50] }
     },
-    minZoomRange: { x: [-10, 10], y: [-10, 10] },
+    minZoomRange: { x: [-5, 5], y: [-5, 5] },
     isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 };
 
@@ -63,9 +63,38 @@ function initCanvas() {
     redrawAll();
 }
 
+// 重构resizeCanvas：动态调整坐标范围以适配全屏
 function resizeCanvas() {
-    config.canvas.width = window.innerWidth;
-    config.canvas.height = window.innerHeight;
+    const canvas = config.canvas;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    // 核心：根据屏幕宽高比动态调整坐标范围，保证单位长度一致且全屏填充
+    const w = canvas.width;
+    const h = canvas.height;
+    const baseRange = 10; // 基础参考范围
+    
+    // 计算宽高比
+    const aspectRatio = w / h;
+    
+    // 动态调整x/y范围，让坐标系填满屏幕
+    if (aspectRatio > 1) {
+        // 宽屏（PC端）：x轴范围按比例扩大，y轴保持基础范围
+        const newXRange = [
+            -baseRange * aspectRatio,
+            baseRange * aspectRatio
+        ];
+        config.xRange = newXRange;
+        config.yRange = [-baseRange, baseRange];
+    } else {
+        // 竖屏（移动端）：y轴范围按比例扩大，x轴保持基础范围
+        const newYRange = [
+            -baseRange / aspectRatio,
+            baseRange / aspectRatio
+        ];
+        config.xRange = [-baseRange, baseRange];
+        config.yRange = newYRange;
+    }
 }
 
 // 重构redrawAll：区分基础函数和趣味曲线
@@ -86,25 +115,40 @@ function drawCoordinateSystem() {
     const h = canvas.height;
     const xMin = xRange[0], xMax = xRange[1];
     const yMin = yRange[0], yMax = yRange[1];
+
+    // 核心：计算等比例单位像素（保证x/y单位长度一致）
+    const pxBase = w / (xMax - xMin);
+    const pyBase = h / (yMax - yMin);
+    const unitPx = Math.min(pxBase, pyBase);
+    
+    // 计算实际可用的坐标范围（确保填满屏幕）
+    const actualXMax = (w / 2) / unitPx;
+    const actualXMin = -actualXMax;
+    const actualYMax = (h / 2) / unitPx;
+    const actualYMin = -actualYMax;
+
+    // 坐标系中心（始终在屏幕中心）
     const ox = w / 2;
     const oy = h / 2;
-    const px = w / (xMax - xMin);
-    const py = h / (yMax - yMin);
 
     ctx.clearRect(0, 0, w, h);
 
-    // 绘制网格
+    // 绘制网格（基于实际可用范围，填满屏幕）
     ctx.strokeStyle = '#eee';
     ctx.lineWidth = 1;
-    for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
-        const pxX = ox + x * px;
+    // X轴网格：从实际最小到实际最大，步长1
+    for (let x = Math.ceil(actualXMin); x <= Math.floor(actualXMax); x++) {
+        const pxX = ox + x * unitPx;
+        if (pxX < 0 || pxX > w) continue;
         ctx.beginPath();
         ctx.moveTo(pxX, 0);
         ctx.lineTo(pxX, h);
         ctx.stroke();
     }
-    for (let y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
-        const pxY = oy - y * py;
+    // Y轴网格：从实际最小到实际最大，步长1
+    for (let y = Math.ceil(actualYMin); y <= Math.floor(actualYMax); y++) {
+        const pxY = oy - y * unitPx;
+        if (pxY < 0 || pxY > h) continue;
         ctx.beginPath();
         ctx.moveTo(0, pxY);
         ctx.lineTo(w, pxY);
@@ -121,23 +165,30 @@ function drawCoordinateSystem() {
     ctx.lineTo(ox, h);
     ctx.stroke();
 
-    // 绘制刻度
+    // 绘制刻度（只显示整数刻度，避免过于密集）
     ctx.fillStyle = '#333';
     ctx.font = '12px Arial';
-    for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+    // X轴刻度：控制密度（PC端每1个单位，移动端每2个单位）
+    const xTickStep = config.isMobile ? 2 : 1;
+    for (let x = Math.ceil(actualXMin); x <= Math.floor(actualXMax); x += xTickStep) {
         if (x === 0) continue;
-        const pxX = ox + x * px;
+        const pxX = ox + x * unitPx;
+        if (pxX < 0 || pxX > w) continue;
         ctx.fillText(x, pxX - 5, oy + 20);
     }
-    for (let y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+    // Y轴刻度：控制密度（PC端每1个单位，移动端每2个单位）
+    const yTickStep = config.isMobile ? 2 : 1;
+    for (let y = Math.ceil(actualYMin); y <= Math.floor(actualYMax); y += yTickStep) {
         if (y === 0) continue;
-        const pxY = oy - y * py;
+        const pxY = oy - y * unitPx;
+        if (pxY < 0 || pxY > h) continue;
         ctx.fillText(y, ox - 25, pxY + 5);
     }
+    // 原点刻度
     ctx.fillText('0', ox + 5, oy + 15);
 }
 
-// 原有基础函数绘制逻辑（保留）
+// 原有基础函数绘制逻辑（适配新的unitPx）
 function convertFormula(f) {
     if (!f) return '';
     
@@ -169,18 +220,25 @@ function drawFormulaCurve(formula) {
     const yMin = yRange[0], yMax = yRange[1];
     const ox = w / 2;
     const oy = h / 2;
-    const px = w / (xMax - xMin);
-    const py = h / (yMax - yMin);
+
+    // 统一单位像素
+    const pxBase = w / (xMax - xMin);
+    const pyBase = h / (yMax - yMin);
+    const unitPx = Math.min(pxBase, pyBase);
+
+    // 计算实际绘制范围（填满屏幕）
+    const actualXMax = (w / 2) / unitPx;
+    const actualXMin = -actualXMax;
 
     ctx.strokeStyle = '#ff0000';
     ctx.lineWidth = 3;
     ctx.beginPath();
 
     let first = true;
-    const step = (xMax - xMin) / 2000;
+    const step = (actualXMax - actualXMin) / 4000; // 更高精度，保证曲线平滑
     const PI = Math.PI;
 
-    for (let x = xMin; x <= xMax; x += step) {
+    for (let x = actualXMin; x <= actualXMax; x += step) {
         try {
             // 过滤tan定义域外的点
             if (formula.includes('tan(x)')) {
@@ -193,13 +251,13 @@ function drawFormulaCurve(formula) {
 
             const y = math.evaluate(f, { x });
 
-            if (isNaN(y) || !isFinite(y) || y < yMin - 1 || y > yMax + 1) {
+            if (isNaN(y) || !isFinite(y)) {
                 first = true;
                 continue;
             }
 
-            const pxX = ox + x * px;
-            const pxY = oy - y * py;
+            const pxX = ox + x * unitPx;
+            const pxY = oy - y * unitPx;
 
             if (pxX < 0 || pxX > w || pxY < 0 || pxY > h) {
                 first = true;
@@ -219,18 +277,26 @@ function drawFormulaCurve(formula) {
     ctx.stroke();
 }
 
-// 新增：趣味曲线独立绘制函数
+// 趣味曲线独立绘制函数（适配新的unitPx和全屏范围）
 function drawFunCurve(curveType) {
     const { ctx, canvas, xRange, yRange } = config;
     const w = canvas.width;
     const h = canvas.height;
-    const xMin = xRange[0], xMax = xRange[1];
-    const yMin = yRange[0], yMax = yRange[1];
     const ox = w / 2;
     const oy = h / 2;
-    const px = w / (xMax - xMin);
-    const py = h / (yMax - yMin);
-    const step = 0.01; // 高精度步长保证曲线平滑
+
+    // 统一单位像素
+    const pxBase = w / (xRange[1] - xRange[0]);
+    const pyBase = h / (yRange[1] - yRange[0]);
+    const unitPx = Math.min(pxBase, pyBase);
+
+    // 计算实际可视范围
+    const actualXMax = (w / 2) / unitPx;
+    const actualXMin = -actualXMax;
+    const actualYMax = (h / 2) / unitPx;
+    const actualYMin = -actualYMax;
+
+    const step = 0.005; // 更高精度，保证曲线平滑
 
     ctx.strokeStyle = '#ff0000';
     ctx.lineWidth = 3;
@@ -239,11 +305,11 @@ function drawFunCurve(curveType) {
     switch (curveType) {
         case 'heart': // 心形线（极坐标转笛卡尔）
             for (let θ = 0; θ < 2 * Math.PI; θ += step) {
-                const r = 5 * (1 - Math.sin(θ)); // 极坐标方程
+                const r = Math.min(actualXMax * 0.4, actualYMax * 0.4) * (1 - Math.sin(θ)); // 适配屏幕大小
                 const x = r * Math.cos(θ);
                 const y = r * Math.sin(θ);
-                const pxX = ox + x * px;
-                const pxY = oy - y * py;
+                const pxX = ox + x * unitPx;
+                const pxY = oy - y * unitPx;
                 if (θ === 0) {
                     ctx.moveTo(pxX, pxY);
                 } else {
@@ -253,15 +319,17 @@ function drawFunCurve(curveType) {
             break;
         
         case 'beat_heart': // 跳动心形线
-            for (let x = -3; x <= 3; x += step) {
-                const y1 = Math.pow(Math.pow(x, 2), 1/3) + 0.9 * Math.sqrt(3.3 - Math.pow(x, 2)) * Math.sin(10 * Math.PI * x);
-                const y2 = Math.pow(Math.pow(x, 2), 1/3) + 0.9 * Math.sqrt(3.3 - Math.pow(x, 2)) * Math.cos(10 * Math.PI * x);
-                // 绘制上下波动的两条线
-                const pxX = ox + x * px;
-                const pxY1 = oy - y1 * py;
-                const pxY2 = oy - y2 * py;
+            const heartRange = Math.min(actualXMax * 0.3, actualYMax * 0.3);
+            for (let x = -heartRange; x <= heartRange; x += step) {
+                const maxY = Math.sqrt(heartRange * heartRange - x * x);
+                if (maxY < 0) continue;
+                const y1 = Math.pow(Math.pow(x, 2), 1/3) + 0.9 * maxY * Math.sin(10 * Math.PI * x);
+                const y2 = Math.pow(Math.pow(x, 2), 1/3) + 0.9 * maxY * Math.cos(10 * Math.PI * x);
+                const pxX = ox + x * unitPx;
+                const pxY1 = oy - y1 * unitPx;
+                const pxY2 = oy - y2 * unitPx;
                 
-                if (x === -3) {
+                if (x === -heartRange) {
                     ctx.moveTo(pxX, pxY1);
                 } else {
                     ctx.lineTo(pxX, pxY1);
@@ -272,11 +340,11 @@ function drawFunCurve(curveType) {
         
         case 'rose_13': // 13瓣玫瑰线
             for (let θ = 0; θ < 4 * Math.PI; θ += step) {
-                const r = 5 * Math.cos(13 * θ / 2);
+                const r = Math.min(actualXMax * 0.4, actualYMax * 0.4) * Math.cos(13 * θ / 2);
                 const x = r * Math.cos(θ);
                 const y = r * Math.sin(θ);
-                const pxX = ox + x * px;
-                const pxY = oy - y * py;
+                const pxX = ox + x * unitPx;
+                const pxY = oy - y * unitPx;
                 if (θ === 0) {
                     ctx.moveTo(pxX, pxY);
                 } else {
@@ -287,11 +355,11 @@ function drawFunCurve(curveType) {
         
         case 'rose_5': // 五瓣玫瑰线
             for (let θ = 0; θ < 2 * Math.PI; θ += step) {
-                const r = 5 * Math.sin(5 * θ);
+                const r = Math.min(actualXMax * 0.4, actualYMax * 0.4) * Math.sin(5 * θ);
                 const x = r * Math.cos(θ);
                 const y = r * Math.sin(θ);
-                const pxX = ox + x * px;
-                const pxY = oy - y * py;
+                const pxX = ox + x * unitPx;
+                const pxY = oy - y * unitPx;
                 if (θ === 0) {
                     ctx.moveTo(pxX, pxY);
                 } else {
@@ -302,11 +370,11 @@ function drawFunCurve(curveType) {
         
         case 'archimedes': // 阿基米德螺线
             for (let θ = 0; θ < 6 * Math.PI; θ += step) {
-                const r = θ / 2;
+                const r = Math.min(actualXMax * 0.05, actualYMax * 0.05) * θ;
                 const x = r * Math.cos(θ);
                 const y = r * Math.sin(θ);
-                const pxX = ox + x * px;
-                const pxY = oy - y * py;
+                const pxX = ox + x * unitPx;
+                const pxY = oy - y * unitPx;
                 if (θ === 0) {
                     ctx.moveTo(pxX, pxY);
                 } else {
@@ -316,11 +384,11 @@ function drawFunCurve(curveType) {
             break;
         
         case 'damped_sin': // 衰减正弦曲线
-            for (let x = -10; x <= 30; x += step) {
-                const y = Math.exp(-x/10) * Math.sin(x);
-                const pxX = ox + x * px;
-                const pxY = oy - y * py;
-                if (x === -10) {
+            for (let x = actualXMin; x <= actualXMax; x += step) {
+                const y = Math.exp(-x/actualXMax) * Math.sin(x * Math.PI / (actualXMax / 5));
+                const pxX = ox + x * unitPx;
+                const pxY = oy - y * unitPx;
+                if (x === actualXMin) {
                     ctx.moveTo(pxX, pxY);
                 } else {
                     ctx.lineTo(pxX, pxY);
@@ -328,12 +396,13 @@ function drawFunCurve(curveType) {
             }
             break;
         
-        case 'circle': // 单位圆
+        case 'circle': // 单位圆（适配屏幕大小）
+            const circleRadius = Math.min(actualXMax * 0.4, actualYMax * 0.4);
             for (let θ = 0; θ < 2 * Math.PI; θ += step) {
-                const x = 5 * Math.cos(θ); // 放大5倍便于观察
-                const y = 5 * Math.sin(θ);
-                const pxX = ox + x * px;
-                const pxY = oy - y * py;
+                const x = circleRadius * Math.cos(θ);
+                const y = circleRadius * Math.sin(θ);
+                const pxX = ox + x * unitPx;
+                const pxY = oy - y * unitPx;
                 if (θ === 0) {
                     ctx.moveTo(pxX, pxY);
                 } else {
@@ -342,12 +411,14 @@ function drawFunCurve(curveType) {
             }
             break;
         
-        case 'ellipse': // 椭圆 x²/4 + y²/9 = 1
+        case 'ellipse': // 椭圆（适配屏幕大小）
+            const ellipseX = Math.min(actualXMax * 0.4, actualYMax * 0.6);
+            const ellipseY = Math.min(actualXMax * 0.6, actualYMax * 0.4);
             for (let θ = 0; θ < 2 * Math.PI; θ += step) {
-                const x = 4 * Math.cos(θ); // 半长轴4（x方向）
-                const y = 6 * Math.sin(θ); // 半长轴6（y方向）
-                const pxX = ox + x * px;
-                const pxY = oy - y * py;
+                const x = ellipseX * Math.cos(θ);
+                const y = ellipseY * Math.sin(θ);
+                const pxX = ox + x * unitPx;
+                const pxY = oy - y * unitPx;
                 if (θ === 0) {
                     ctx.moveTo(pxX, pxY);
                 } else {
@@ -360,7 +431,7 @@ function drawFunCurve(curveType) {
     ctx.stroke();
 }
 
-// 缩放逻辑（保留原有）
+// 缩放逻辑（适配新的全屏范围）
 function handleWheel(e) {
     e.preventDefault();
     const factor = 1.2;
@@ -389,7 +460,7 @@ function handleWheel(e) {
     redrawAll();
 }
 
-// 绑定缩放按钮事件（保留原有）
+// 绑定缩放按钮事件（保留原有，适配新范围）
 function bindZoomBtnEvents() {
     const zoomInBtn = document.getElementById('zoomInBtn');
     const zoomOutBtn = document.getElementById('zoomOutBtn');
@@ -487,7 +558,7 @@ function bindInfoCardEvents() {
     card.style.display = 'block';
 }
 
-// 绑定鼠标悬停坐标提示事件（适配趣味曲线，简化提示）
+// 绑定鼠标悬停坐标提示事件（适配新的unitPx和全屏范围）
 function bindTooltipEvents() {
     const tooltip = document.getElementById('coordTooltip');
     const tooltipText = document.getElementById('tooltipText');
@@ -497,12 +568,13 @@ function bindTooltipEvents() {
         const { xRange, yRange, currentCurveType } = config;
         const w = canvas.width;
         const h = canvas.height;
-        const xMin = xRange[0], xMax = xRange[1];
-        const yMin = yRange[0], yMax = yRange[1];
         const ox = w / 2;
         const oy = h / 2;
-        const px = w / (xMax - xMin);
-        const py = h / (yMax - yMin);
+
+        // 统一单位像素
+        const pxBase = w / (xRange[1] - xRange[0]);
+        const pyBase = h / (yRange[1] - yRange[0]);
+        const unitPx = Math.min(pxBase, pyBase);
 
         // 获取鼠标在画布中的坐标
         const rect = canvas.getBoundingClientRect();
@@ -510,8 +582,8 @@ function bindTooltipEvents() {
         const mouseY = e.clientY - rect.top;
 
         // 转换为数学坐标系坐标
-        const mathX = Math.round((mouseX - ox) / px * 100) / 100;
-        const mathY = Math.round((oy - mouseY) / py * 100) / 100;
+        const mathX = Math.round((mouseX - ox) / unitPx * 100) / 100;
+        const mathY = Math.round((oy - mouseY) / unitPx * 100) / 100;
 
         if (currentCurveType === 'fun') {
             // 趣味曲线仅显示鼠标位置坐标
